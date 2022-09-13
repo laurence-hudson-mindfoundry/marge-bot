@@ -80,6 +80,7 @@ class Bot:
                         log.info('Starting to watch for %s', project.path_with_namespace)
                         thread = threading.Thread(
                             target=self._process_project,
+                            name=project.path,
                             args=(repo_manager, time_to_sleep_between_projects_in_secs, project, True),
                             daemon=True
                         )
