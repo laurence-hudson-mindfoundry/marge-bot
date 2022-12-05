@@ -353,5 +353,14 @@ def main(args=None):
             cli=options.cli,
         )
 
+        if config.concurrent_projects:
+            threaded_log_formatter = logging.Formatter(
+                '%(asctime)s %(levelname)s [%(threadName)s] %(message)s',
+            )
+            logger = logging.getLogger()
+            if not logger.handlers:
+                logger.addHandler(logging.StreamHandler())
+            logger.handlers[0].setFormatter(threaded_log_formatter)
+
         marge_bot = bot.Bot(api=api, config=config)
         marge_bot.start()

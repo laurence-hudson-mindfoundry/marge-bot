@@ -33,11 +33,13 @@ class Bot:
             )
 
     def start(self):
+        skip_clone = self._config.merge_opts.fusion is Fusion.gitlab_rebase
         with TemporaryDirectory() as root_dir:
             if self._config.use_https:
                 repo_manager = store.HttpsRepoManager(
                     user=self.user,
                     root_dir=root_dir,
+                    skip_clone=skip_clone,
                     auth_token=self._config.auth_token,
                     timeout=self._config.git_timeout,
                     reference=self._config.git_reference_repo,
@@ -46,6 +48,7 @@ class Bot:
                 repo_manager = store.SshRepoManager(
                     user=self.user,
                     root_dir=root_dir,
+                    skip_clone=skip_clone,
                     ssh_key_file=self._config.ssh_key_file,
                     timeout=self._config.git_timeout,
                     reference=self._config.git_reference_repo,
@@ -73,21 +76,19 @@ class Bot:
         while True:
             projects = self._get_projects()
 
-            # Purge dead threads so they can restart
-            project_threads = dict(filter(lambda thread: thread[1].is_alive(), project_threads.items()))
-            # Quit threads for removed projects
-            # ... no built in thread quiting, assume these will exit naturally
-
             for project in projects:
                 if self._config.concurrent_projects:
-                    if project.path_with_namespace not in project_threads:
+                    thread = project_threads.get(project.path_with_namespace)
+                    if thread is None or not thread.is_alive():
                         log.info('Starting to watch for %s', project.path_with_namespace)
-                        project_threads[project.path_with_namespace] = threading.Thread(
+                        thread = threading.Thread(
                             target=self._process_project,
+                            name=project.path,
                             args=(repo_manager, time_to_sleep_between_projects_in_secs, project, True),
                             daemon=True
                         )
-                        project_threads[project.path_with_namespace].start()
+                        thread.start()
+                        project_threads[project.path_with_namespace] = thread
                 else:
                     self._process_project(
                         repo_manager,
